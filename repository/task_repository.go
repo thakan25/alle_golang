@@ -18,6 +18,7 @@ type TaskRepository interface {
 	Create(task *models.Task) error
 	GetByID(id string) (*models.Task, error)
 	GetAll() ([]*models.Task, error)
+	GetByStatus(status models.TaskStatus) ([]*models.Task, error)
 	Update(task *models.Task) error
 	Delete(id string) error
 }
@@ -64,6 +65,19 @@ func (r *InMemoryTaskRepository) GetAll() ([]*models.Task, error) {
 	tasks := make([]*models.Task, 0, len(r.tasks))
 	for _, task := range r.tasks {
 		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
+
+func (r *InMemoryTaskRepository) GetByStatus(status models.TaskStatus) ([]*models.Task, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tasks := make([]*models.Task, 0, len(r.tasks))
+	for _, task := range r.tasks {
+		if task.Status == status {
+			tasks = append(tasks, task)
+		}
 	}
 	return tasks, nil
 }

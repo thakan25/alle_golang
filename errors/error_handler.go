@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"task-manager/logging"
 	"task-manager/repository"
 	"task-manager/service"
 )
@@ -19,9 +20,13 @@ func ErrorHandler(next http.Handler) http.Handler {
 		// Create a custom response writer to capture the response
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 		
+		// Log request details
+		logging.Info("Incoming request: %s %s", r.Method, r.URL.Path)
+		
 		// Use defer to recover from panics
 		defer func() {
 			if err := recover(); err != nil {
+				logging.Error("Panic recovered: %v", err)
 				handleError(w, err.(error))
 			}
 		}()
@@ -34,15 +39,20 @@ func ErrorHandler(next http.Handler) http.Handler {
 func handleError(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 
+	var statusCode int
 	switch err {
 	case repository.ErrTaskNotFound:
-		w.WriteHeader(http.StatusNotFound)
+		statusCode = http.StatusNotFound
+		logging.Error("Task not found: %v", err)
 	case service.ErrInvalidTaskStatus:
-		w.WriteHeader(http.StatusBadRequest)
+		statusCode = http.StatusBadRequest
+		logging.Error("Invalid task status: %v", err)
 	default:
-		w.WriteHeader(http.StatusInternalServerError)
+		statusCode = http.StatusInternalServerError
+		logging.Error("Internal server error: %v", err)
 	}
 
+	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 }
 
