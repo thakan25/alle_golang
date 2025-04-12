@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"task-manager/common"
 	"task-manager/logging"
-	"task-manager/repository"
-	"task-manager/service"
 )
 
 // ErrorResponse represents an error response
@@ -41,12 +40,24 @@ func handleError(w http.ResponseWriter, err error) {
 
 	var statusCode int
 	switch err {
-	case repository.ErrTaskNotFound:
+	case common.ErrTaskNotFound:
 		statusCode = http.StatusNotFound
 		logging.Error("Task not found: %v", err)
-	case service.ErrInvalidTaskStatus:
+	case common.ErrInvalidTaskStatus:
 		statusCode = http.StatusBadRequest
 		logging.Error("Invalid task status: %v", err)
+	case common.ErrUserNotFound:
+		statusCode = http.StatusNotFound
+		logging.Error("User not found: %v", err)
+	case common.ErrEmailExists:
+		statusCode = http.StatusConflict
+		logging.Error("Email already exists: %v", err)
+	case common.ErrInvalidCredentials:
+		statusCode = http.StatusUnauthorized
+		logging.Error("Invalid credentials: %v", err)
+	case common.ErrInvalidRequest:
+		statusCode = http.StatusBadRequest
+		logging.Error("Invalid request: %v", err)
 	default:
 		statusCode = http.StatusInternalServerError
 		logging.Error("Internal server error: %v", err)

@@ -1,16 +1,12 @@
 package repository
 
 import (
-	"errors"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"task-manager/common"
 	"task-manager/models"
-)
-
-var (
-	ErrTaskNotFound = errors.New("task not found")
 )
 
 // TaskRepository defines the interface for task data access
@@ -37,6 +33,10 @@ func NewInMemoryTaskRepository() *InMemoryTaskRepository {
 }
 
 func (r *InMemoryTaskRepository) Create(task *models.Task) error {
+	if task == nil {
+		return common.ErrInvalidTaskStatus
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -48,12 +48,16 @@ func (r *InMemoryTaskRepository) Create(task *models.Task) error {
 }
 
 func (r *InMemoryTaskRepository) GetByID(id string) (*models.Task, error) {
+	if id == "" {
+		return nil, common.ErrInvalidTaskStatus
+	}
+
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	task, exists := r.tasks[id]
 	if !exists {
-		return nil, ErrTaskNotFound
+		return nil, common.ErrTaskNotFound
 	}
 	return task, nil
 }
@@ -83,11 +87,18 @@ func (r *InMemoryTaskRepository) GetByStatus(status models.TaskStatus) ([]*model
 }
 
 func (r *InMemoryTaskRepository) Update(task *models.Task) error {
+	if task == nil {
+		return common.ErrInvalidTaskStatus
+	}
+	if task.ID == "" {
+		return common.ErrInvalidTaskStatus
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.tasks[task.ID]; !exists {
-		return ErrTaskNotFound
+		return common.ErrTaskNotFound
 	}
 
 	task.UpdatedAt = time.Now()
@@ -96,11 +107,15 @@ func (r *InMemoryTaskRepository) Update(task *models.Task) error {
 }
 
 func (r *InMemoryTaskRepository) Delete(id string) error {
+	if id == "" {
+		return common.ErrInvalidTaskStatus
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.tasks[id]; !exists {
-		return ErrTaskNotFound
+		return common.ErrTaskNotFound
 	}
 
 	delete(r.tasks, id)
