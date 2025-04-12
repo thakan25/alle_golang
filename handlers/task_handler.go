@@ -57,6 +57,7 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 // GetTasks handles getting all tasks
 func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	statusParam := r.URL.Query().Get("status")
+	logging.Info("Getting all tasks with status: %s", statusParam)
 	
 	taskDTOs, err := h.service.GetTasks(statusParam)
 	if err != nil {
@@ -66,7 +67,7 @@ func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to responses
-	responses := h.adapter.ToTaskResponses(taskDTOs)
+	responses := h.adapter.ToTasksResponse(taskDTOs)
 	json.NewEncoder(w).Encode(responses)
 }
 
@@ -74,6 +75,7 @@ func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) GetTasksByUserID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID := vars["userId"]
+	logging.Info("Getting tasks for user ID: %s", userID)
 
 	tasks, err := h.service.GetTasksByUserID(userID)
 	if err != nil {
@@ -83,7 +85,7 @@ func (h *TaskHandler) GetTasksByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to responses
-	responses := h.adapter.ToTaskResponses(tasks)
+	responses := h.adapter.ToTasksResponse(tasks)
 	json.NewEncoder(w).Encode(responses)
 }
 

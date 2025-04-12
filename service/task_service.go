@@ -82,34 +82,35 @@ func (s *TaskService) CreateTask(dto dtos.CreateTaskDTO) (*dtos.TaskDTO, error) 
 	return &resultDTO, nil
 }
 
-// GetTasks retrieves all tasks or filters by status if provided
-func (s *TaskService) GetTasks(statusParam string) ([]dtos.TaskDTO, error) {
-	if statusParam != "" {
-		// Validate status
-		status := models.TaskStatus(statusParam)
-		if !s.isValidStatus(status) {
-			logging.Error("Invalid status parameter: %s", statusParam)
-			return nil, common.ErrInvalidTaskStatus
-		}
-
-		logging.Info("Fetching tasks with status: %s", status)
-		tasks, err := s.repo.GetByStatus(status)
-		if err != nil {
-			logging.Error("Failed to fetch tasks with status %s: %v", status, err)
-			return nil, err
-		}
-		logging.Info("Successfully fetched %d tasks with status %s", len(tasks), status)
-		return s.adapter.ToTaskDTOs(tasks), nil
-	}
-
-	logging.Info("Fetching all tasks")
+// GetTasks retrieves all tasks
+func (s *TaskService) GetTasks(status string) ([]*dtos.TaskDTO, error) {
+	logging.Info("Retrieving all tasks with status: %s", status)
 	tasks, err := s.repo.GetAll()
 	if err != nil {
-		logging.Error("Failed to fetch tasks from repository: %v", err)
+		logging.Error("Error retrieving tasks: %v", err)
 		return nil, err
 	}
-	logging.Info("Successfully fetched %d tasks", len(tasks))
-	return s.adapter.ToTaskDTOs(tasks), nil
+
+	// Convert to DTOs
+	taskDTOs := make([]*dtos.TaskDTO, len(tasks))
+	for i, task := range tasks {
+		dto := s.adapter.ToTaskDTO(task)
+		taskDTOs[i] = &dto
+	}
+
+	// Filter by status if provided
+	if status != "" {
+		filteredDTOs := make([]*dtos.TaskDTO, 0)
+		for _, dto := range taskDTOs {
+			if dto.Status == status {
+				filteredDTOs = append(filteredDTOs, dto)
+			}
+		}
+		taskDTOs = filteredDTOs
+	}
+
+	logging.Info("Retrieved %d tasks", len(taskDTOs))
+	return taskDTOs, nil
 }
 
 // GetTask retrieves a task by ID
@@ -240,8 +241,8 @@ func (s *TaskService) GetTasksByUserID(userID string) ([]*dtos.TaskDTO, error) {
 	var userTasks []*dtos.TaskDTO
 	for _, task := range tasks {
 		if task.UserID == userID {
-			taskDTO := s.adapter.ToTaskDTO(task)
-			userTasks = append(userTasks, &taskDTO)
+			dto := s.adapter.ToTaskDTO(task)
+			userTasks = append(userTasks, &dto)
 		}
 	}
 	logging.Info("Found %d tasks for user", len(userTasks))

@@ -55,15 +55,6 @@ func (a *ControllerToServiceAdapter) ToTasksResponse(dtos []*dtos.TaskDTO) respo
 	return responses.TasksResponse{Tasks: tasks}
 }
 
-// ToTaskResponses converts a slice of TaskDTOs to TaskResponses
-func (a *ControllerToServiceAdapter) ToTaskResponses(dtos []*dtos.TaskDTO) []responses.TaskResponse {
-	responses := make([]responses.TaskResponse, len(dtos))
-	for i, dto := range dtos {
-		responses[i] = a.ToTaskResponse(*dto)
-	}
-	return responses
-}
-
 func (a *ControllerToServiceAdapter) ToCreateUserDTO(req requests.CreateUserRequest) dtos.CreateUserDTO {
 	return dtos.CreateUserDTO{
 		Username: req.Username,
