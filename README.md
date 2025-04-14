@@ -1,91 +1,134 @@
-# Task Management Microservice
+# User Service
 
-A microservice for managing tasks, built with Go and following microservices best practices.
+A microservice for user management built with Go and MongoDB.
 
-## Current Features
+## Features
 
-- RESTful API for task management
-- In-memory storage
-- Basic CRUD operations
+- User CRUD operations (Create, Read, Update, Delete)
+- MongoDB integration for data persistence
+- RESTful API with JSON responses
+- Input validation for email, password, and username
+- Environment-based configuration
 - Health check endpoint
+
+## Prerequisites
+
+- Go 1.18 or later
+- MongoDB 4.4 or later
+
+## Configuration
+
+The service can be configured using environment variables:
+
+```env
+PORT=8081                            # Server port (default: 8081)
+MONGO_URI=mongodb://localhost:27017  # MongoDB connection URI
+DB_NAME=user_service                 # MongoDB database name
+```
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd user-service
+```
+
+2. Install dependencies:
+```bash
+go mod download
+```
+
+3. Run the service:
+```bash
+go run main.go
+```
 
 ## API Endpoints
 
-- `POST /tasks` - Create a new task
-- `GET /tasks` - Get all tasks
-- `GET /tasks/{id}` - Get a specific task
-- `PUT /tasks/{id}` - Update a task
-- `DELETE /tasks/{id}` - Delete a task
-- `GET /health` - Health check endpoint
+### Health Check
+```
+GET /health
+Response: 200 OK
+```
 
-## Todo List
+### Create User
+```
+POST /api/v1/users
+Content-Type: application/json
 
-### High Priority
-- [ ] Add input validation for task fields
-- [ ] Add proper error handling middleware
-- [ ] Add logging middleware
-- [ ] Add unit tests
-- [ ] Add integration tests
-- [ ] Add API documentation (Swagger/OpenAPI)
-- [ ] Add database support (PostgreSQL/MySQL)
-- [ ] Add configuration management
-- [ ] Add Docker support
+Request:
+{
+    "email": "user@example.com",
+    "password": "password123",
+    "username": "johndoe"
+}
 
-### Medium Priority
-- [ ] Add authentication/authorization
-- [ ] Add rate limiting
-- [ ] Add request/response logging
-- [ ] Add metrics and monitoring
-- [ ] Add caching layer
-- [ ] Add pagination for GET /tasks
-- [ ] Add filtering and sorting for GET /tasks
-- [ ] Add task categories/tags
-- [ ] Add task priorities
-- [ ] Add task due dates
+Response: 201 Created
+{
+    "id": "...",
+    "email": "user@example.com",
+    "username": "johndoe",
+    "created_at": "...",
+    "updated_at": "..."
+}
+```
 
+### Get User
+```
+GET /api/v1/users/{id}
+Response: 200 OK
+```
 
-### Performance Improvements
-- [ ] Add connection pooling
-- [ ] Implement caching
-- [ ] Add database indexing
-- [ ] Implement query optimization
-- [ ] Add load balancing
-- [ ] Implement horizontal scaling
-- [ ] Add performance monitoring
-- [ ] Implement resource limits
-- [ ] Add performance testing
+### Get All Users
+```
+GET /api/v1/users
+Response: 200 OK
+```
 
-### DevOps & Deployment
-- [ ] Add CI/CD pipeline
-- [ ] Add Kubernetes deployment
-- [ ] Implement automated testing
-- [ ] Add deployment automation
-- [ ] Implement monitoring
-- [ ] Add alerting
-- [ ] Implement backup strategy
-- [ ] Add disaster recovery
-- [ ] Implement zero-downtime deployment
-- [ ] Add infrastructure as code
+### Update User
+```
+PUT /api/v1/users/{id}
+Content-Type: application/json
 
-## Getting Started
+Request:
+{
+    "email": "newemail@example.com",
+    "password": "newpassword123",
+    "username": "newusername"
+}
 
-1. Install Go 1.21 or later
-2. Clone the repository
-3. Install dependencies:
-   ```bash
-   go mod download
-   ```
-4. Run the service:
-   ```bash
-   go run main.go
-   ```
+Response: 200 OK
+```
+
+### Delete User
+```
+DELETE /api/v1/users/{id}
+Response: 204 No Content
+```
+
+## Error Responses
+
+The API returns appropriate HTTP status codes and error messages:
+
+- 400 Bad Request: Invalid input data
+- 404 Not Found: User not found
+- 409 Conflict: User already exists
+- 500 Internal Server Error: Server-side error
 
 ## Project Structure
 
 ```
 .
-├── handlers/     # HTTP request handlers
-├── models/       # Data structures
-├── repository/   # Data access layer
-└── main.go       # Application entry point
+├── config/         # Configuration management
+├── handlers/       # HTTP request handlers
+├── models/         # Data models and DTOs
+├── repository/     # Data access layer
+│   └── mongodb/   # MongoDB implementation
+├── service/        # Business logic
+└── main.go        # Application entry point
 ```
+
+## License
+
+MIT

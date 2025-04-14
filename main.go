@@ -1,67 +1,75 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
-	"strconv"
+	"os"
 
-	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	"task-manager/config"
-	"task-manager/handlers"
-	"task-manager/repository"
-	"task-manager/service"
-	"task-manager/errors"
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/SachinThakan/task-manager/config"
+	"github.com/SachinThakan/task-manager/constants"
+	"github.com/SachinThakan/task-manager/handlers"
+	"github.com/SachinThakan/task-manager/accessor"
+	"github.com/SachinThakan/task-manager/repository/mongodb"
+	"github.com/SachinThakan/task-manager/service"
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
-	}
-
 	// Load configuration
 	cfg := config.LoadConfig()
 
+	// Connect to MongoDB
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.MongoDB.Timeout)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.MongoDB.URI))
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
+	}
+	defer client.Disconnect(context.Background())
+
+	// Ping MongoDB
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatalf("Failed to ping MongoDB: %v", err)
+	}
+	log.Println("Connected to MongoDB")
+
 	// Initialize repositories
-	taskRepo := repository.NewInMemoryTaskRepository()
-	userRepo := repository.NewInMemoryUserRepository()
+	taskRepo := mongodb.NewTaskRepository(client, cfg.MongoDB.Database)
+	userAccessor := accessor.NewUserServiceAccessor()
 
 	// Initialize services
-	taskService := service.NewTaskService(taskRepo, userRepo)
-	userService := service.NewUserService(userRepo)
+	taskService := service.NewTaskService(taskRepo, *userAccessor)
 
 	// Initialize handlers
 	taskHandler := handlers.NewTaskHandler(taskService)
-	userHandler := handlers.NewUserHandler(userService)
 
 	// Initialize router
-	router := mux.NewRouter()
+	router := gin.Default()
 
-	// Apply error handling middleware
-	router.Use(errors.ErrorHandler)
+	// Health check
+	router.GET(constants.Health, func(c *gin.Context) {
+		c.String(http.StatusOK, "OK")
+	})
 
-	// Health check endpoint
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	}).Methods("GET")
-
-	// User endpoints
-	router.HandleFunc("/users", userHandler.CreateUser).Methods("POST")
-	router.HandleFunc("/users", userHandler.GetUsers).Methods("GET")
-	router.HandleFunc("/users/{id}", userHandler.GetUser).Methods("GET")
-	router.HandleFunc("/users/{id}", userHandler.DeleteUser).Methods("DELETE")
-
-	// Task endpoints
-	router.HandleFunc("/tasks", taskHandler.CreateTask).Methods("POST")
-	router.HandleFunc("/tasks", taskHandler.GetTasks).Methods("GET")
-	router.HandleFunc("/tasks/{id}", taskHandler.GetTask).Methods("GET")
-	router.HandleFunc("/tasks/{id}", taskHandler.UpdateTask).Methods("PUT")
-	router.HandleFunc("/tasks/{id}", taskHandler.DeleteTask).Methods("DELETE")
-	router.HandleFunc("/users/{userId}/tasks", taskHandler.GetTasksByUserID).Methods("GET")
+	// API routes
+	api := router.Group(constants.ApiPath)
+	tasks := api.Group(constants.BasePath)
+	{
+		tasks.POST(constants.DefaultPath, taskHandler.CreateTask)
+		tasks.GET(constants.DefaultPath, taskHandler.GetTasks)
+		tasks.PUT(constants.IDPath, taskHandler.UpdateTask)
+		tasks.DELETE(constants.IDPath, taskHandler.DeleteTask)
+	}
 
 	// Start server
-	log.Printf("Server starting on port %d", cfg.ServerPort)
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.ServerPort), router))
+	port := os.Getenv(constants.DefaultPort)
+	if port == "" {
+		port = constants.DefaultPort
+	}
+	router.Run(":" + port)
 } 

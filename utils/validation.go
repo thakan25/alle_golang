@@ -2,47 +2,78 @@ package utils
 
 import (
 	"regexp"
-	"task-manager/common"
+	"errors"
 )
 
-// ValidateEmail checks if the email is valid
+var (
+	ErrInvalidEmail     = errors.New("invalid email format")
+	ErrPasswordTooShort = errors.New("password must be at least 6 characters")
+	ErrUsernameTooShort = errors.New("username must be at least 3 characters")
+	ErrInvalidRequest   = errors.New("invalid request")
+)
+
+// EmailRegex is the regular expression for validating email addresses
+var EmailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+// ValidateEmail validates an email address
 func ValidateEmail(email string) error {
+	if !EmailRegex.MatchString(email) {
+		return ErrInvalidEmail
+	}
+	return nil
+}
+
+// ValidatePassword validates a password
+func ValidatePassword(password string) error {
+	if len(password) < 6 {
+		return ErrPasswordTooShort
+	}
+	return nil
+}
+
+// ValidateUsername validates a username
+func ValidateUsername(username string) error {
+	if len(username) < 3 {
+		return ErrUsernameTooShort
+	}
+	return nil
+}
+
+func ValidateEmailError(email string) error {
 	if email == "" {
-		return common.ErrInvalidRequest
+		return ErrInvalidRequest
 	}
 	
 	// Basic email regex validation
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(email) {
-		return common.ErrInvalidRequest
+		return ErrInvalidRequest
 	}
 	
 	return nil
 }
 
-// ValidatePassword checks if the password meets requirements
-func ValidatePassword(password string) error {
+func ValidatePasswordError(password string) error {
 	if password == "" {
-		return common.ErrInvalidRequest
+		return ErrInvalidRequest
 	}
 	
-	// Password should be at least 8 characters
-	if len(password) < 8 {
-		return common.ErrInvalidRequest
+	// Password should be at least 6 characters
+	if len(password) < 6 {
+		return ErrPasswordTooShort
 	}
 	
 	return nil
 }
 
-// ValidateUsername checks if the username is valid
-func ValidateUsername(username string) error {
+func ValidateUsernameError(username string) error {
 	if username == "" {
-		return common.ErrInvalidRequest
+		return ErrInvalidRequest
 	}
 	
-	// Username should be between 3 and 20 characters
-	if len(username) < 3 || len(username) > 20 {
-		return common.ErrInvalidRequest
+	// Username should be at least 3 characters
+	if len(username) < 3 {
+		return ErrUsernameTooShort
 	}
 	
 	return nil

@@ -2,7 +2,8 @@ package dtos
 
 import (
 	"time"
-	"task-manager/models"
+
+	"github.com/SachinThakan/task-manager/models"
 )
 
 // TaskDTO represents the task data transfer object for service layer

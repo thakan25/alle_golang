@@ -1,21 +1,25 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
+	"strconv"
 
-	"github.com/gorilla/mux"
-	"task-manager/adapters"
-	"task-manager/logging"
-	"task-manager/models/requests"
-	"task-manager/service"
+	"github.com/gin-gonic/gin"
+	"github.com/SachinThakan/task-manager/adapters"
+	// "github.com/SachinThakan/task-manager/models"
+	// "github.com/SachinThakan/task-manager/models/dtos"
+	"github.com/SachinThakan/task-manager/models/requests"
+	"github.com/SachinThakan/task-manager/service"
+	
 )
 
+// TaskHandler handles HTTP requests for tasks
 type TaskHandler struct {
 	service *service.TaskService
 	adapter *adapters.ControllerToServiceAdapter
 }
 
+// NewTaskHandler creates a new task handler
 func NewTaskHandler(service *service.TaskService) *TaskHandler {
 	return &TaskHandler{
 		service: service,
@@ -23,120 +27,85 @@ func NewTaskHandler(service *service.TaskService) *TaskHandler {
 	}
 }
 
-// respondJSON writes a JSON response with the given status code
-func (h *TaskHandler) respondJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if data != nil {
-		json.NewEncoder(w).Encode(data)
-	}
-}
-
-func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
+// CreateTask handles the creation of a new task
+func (h *TaskHandler) CreateTask(c *gin.Context) {
 	var req requests.CreateTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logging.Error("Failed to decode task request body: %v", err)
-		panic(err)
-	}
-
-	// Convert request to service DTO
-	createTaskDto := h.adapter.ToCreateTaskDTO(req)
-
-	// Call service
-	taskDTO, err := h.service.CreateTask(createTaskDto)
-	if err != nil {
-		logging.Error("Failed to create task: %v", err)
-		panic(err)
-	}
-
-	// Convert service DTO to response
-	resp := h.adapter.ToTaskResponse(*taskDTO)
-	h.respondJSON(w, http.StatusCreated, resp)
-}
-
-// GetTasks handles getting all tasks
-func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
-	statusParam := r.URL.Query().Get("status")
-	logging.Info("Getting all tasks with status: %s", statusParam)
-	
-	taskDTOs, err := h.service.GetTasks(statusParam)
-	if err != nil {
-		logging.Error("Error getting tasks: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Convert to responses
-	responses := h.adapter.ToTasksResponse(taskDTOs)
-	json.NewEncoder(w).Encode(responses)
-}
+	// Convert request to entity
+	task := h.adapter.ToCreateTaskDTO(req)
 
-// GetTasksByUserID handles getting tasks for a specific user
-func (h *TaskHandler) GetTasksByUserID(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID := vars["userId"]
-	logging.Info("Getting tasks for user ID: %s", userID)
-
-	tasks, err := h.service.GetTasksByUserID(userID)
+	// Create task
+	taskDto, err := h.service.CreateTask(c.Request.Context(), task)
 	if err != nil {
-		logging.Error("Error getting tasks for user: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Convert to responses
-	responses := h.adapter.ToTasksResponse(tasks)
-	json.NewEncoder(w).Encode(responses)
+	// Convert entity to response
+	response := h.adapter.ToTaskResponse(taskDto)
+	c.JSON(http.StatusCreated, response)
 }
 
-func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
-	taskDTO, err := h.service.GetTask(id)
-	if err != nil {
-		logging.Error("Failed to get task with ID %s: %v", id, err)
-		panic(err)
+// GetTask handles retrieving a single task by ID
+func (h *TaskHandler) GetTasks(c *gin.Context) {
+	userID := c.Query("user_id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
+		return
 	}
 
-	// Convert service DTO to response
-	resp := h.adapter.ToTaskResponse(*taskDTO)
-	h.respondJSON(w, http.StatusOK, resp)
+	status := c.Query("status")
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+
+	tasks, err := h.service.GetTasks(c.Request.Context(), userID, status, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tasks"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": tasks})
 }
 
-func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
+// UpdateTask handles updating a task
+func (h *TaskHandler) UpdateTask(c *gin.Context) {
+	id := c.Param("id")
 	var req requests.UpdateTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logging.Error("Failed to decode task update request body: %v", err)
-		panic(err)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	// Convert request to service DTO
-	updateDTO := h.adapter.ToUpdateTaskDTO(id, req)
+	// Convert request to entity
+	task := h.adapter.ToTaskDtoForUpdate(req)
+	task.ID = id
 
-	// Call service
-	taskDTO, err := h.service.UpdateTask(updateDTO)
+	// Update task
+	taskDto, err := h.service.UpdateTask(c.Request.Context(), task)
 	if err != nil {
-		logging.Error("Failed to update task with ID %s: %v", id, err)
-		panic(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
-	// Convert service DTO to response
-	resp := h.adapter.ToTaskResponse(*taskDTO)
-	h.respondJSON(w, http.StatusOK, resp)
+	// Convert entity to response
+	response := h.adapter.ToTaskResponse(taskDto)
+	c.JSON(http.StatusOK, response)
 }
 
-func (h *TaskHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
-	if err := h.service.DeleteTask(id); err != nil {
-		logging.Error("Failed to delete task with ID %s: %v", id, err)
-		panic(err)
+// DeleteTask handles deleting a task
+func (h *TaskHandler) DeleteTask(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.service.DeleteTask(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
-	h.respondJSON(w, http.StatusNoContent, nil)
+	c.Status(http.StatusNoContent)
 } 

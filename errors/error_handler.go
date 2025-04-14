@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"task-manager/common"
-	"task-manager/logging"
+	"github.com/SachinThakan/task-manager/common"
+	"github.com/SachinThakan/task-manager/logging"
 )
 
 // ErrorResponse represents an error response

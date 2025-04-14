@@ -1,42 +1,43 @@
 package service
 
 import (
-	"time"
-	"strings"
-
-	"task-manager/adapters"
-	"task-manager/common"
-	"task-manager/logging"
-	"task-manager/models"
-	"task-manager/models/dtos"
-	"task-manager/repository"
+	"github.com/SachinThakan/task-manager/models"
+	"github.com/SachinThakan/task-manager/repository"
+	"github.com/SachinThakan/task-manager/accessor"
+	"github.com/SachinThakan/task-manager/logging"
+	"github.com/SachinThakan/task-manager/models/dtos"
+	"github.com/SachinThakan/task-manager/common"
 	"github.com/google/uuid"
+	"strings"
+	"context"
+	"time"
+	"fmt"
+	"github.com/SachinThakan/task-manager/adapters"
 )
 
 // TaskService handles business logic for tasks
 type TaskService struct {
-	repo    repository.TaskRepository
-	userRepo repository.UserRepository
+	repo repository.TaskRepository
+	userService accessor.UserServiceAccessor
 	adapter *adapters.ServiceToRepositoryAdapter
 }
 
 // NewTaskService creates a new task service
-func NewTaskService(repo repository.TaskRepository, userRepo repository.UserRepository) *TaskService {
-	logging.Info("Initializing new TaskService")
+func NewTaskService(repo repository.TaskRepository, userService accessor.UserServiceAccessor) *TaskService {
 	return &TaskService{
-		repo:     repo,
-		userRepo: userRepo,
-		adapter:  adapters.NewServiceToRepositoryAdapter(),
+		repo: repo,
+		userService: userService,
+		adapter: adapters.NewServiceToRepositoryAdapter(),
 	}
 }
 
 // CreateTask creates a new task
-func (s *TaskService) CreateTask(dto dtos.CreateTaskDTO) (*dtos.TaskDTO, error) {
+func (s *TaskService) CreateTask(ctx context.Context, dto dtos.CreateTaskDTO) (*dtos.TaskDTO, error) {
 	logging.Info("Creating new task for user ID: %s", dto.UserID)
 	logging.Info("Task details - Title: %s, Description: %s, DueDate: %v", dto.Title, dto.Description, dto.DueDate)
 
 	// Validate user exists
-	user, err := s.userRepo.GetByID(dto.UserID)
+	user, err := s.userService.GetUserByID(dto.UserID)
 	if err != nil {
 		logging.Error("Error finding user: %v", err)
 		return nil, err
@@ -70,7 +71,7 @@ func (s *TaskService) CreateTask(dto dtos.CreateTaskDTO) (*dtos.TaskDTO, error) 
 	logging.Info("Converted to task entity: %+v", task)
 
 	// Save task
-	if err := s.repo.Create(task); err != nil {
+	if err := s.repo.Create(ctx, task); err != nil {
 		logging.Error("Error saving task: %v", err)
 		return nil, err
 	}
@@ -82,52 +83,30 @@ func (s *TaskService) CreateTask(dto dtos.CreateTaskDTO) (*dtos.TaskDTO, error) 
 	return &resultDTO, nil
 }
 
-// GetTasks retrieves all tasks
-func (s *TaskService) GetTasks(status string) ([]*dtos.TaskDTO, error) {
-	logging.Info("Retrieving all tasks with status: %s", status)
-	tasks, err := s.repo.GetAll()
+// GetTask retrieves a task by ID
+func (s *TaskService) GetTasks(ctx context.Context, userID, status string, page, limit int) ([]*dtos.TaskDTO, error) {
+	if userID == "" {
+		logging.Error("userID is required")
+		return nil, fmt.Errorf("userID is required")
+	}
+	
+	tasks, err := s.repo.GetPaginatedTasks(ctx, userID, models.TaskStatus(status), page, limit)
 	if err != nil {
-		logging.Error("Error retrieving tasks: %v", err)
+		logging.Error("Error retrieving paginated tasks: %v", err)
 		return nil, err
 	}
 
-	// Convert to DTOs
 	taskDTOs := make([]*dtos.TaskDTO, len(tasks))
 	for i, task := range tasks {
 		dto := s.adapter.ToTaskDTO(task)
 		taskDTOs[i] = &dto
 	}
 
-	// Filter by status if provided
-	if status != "" {
-		filteredDTOs := make([]*dtos.TaskDTO, 0)
-		for _, dto := range taskDTOs {
-			if dto.Status == status {
-				filteredDTOs = append(filteredDTOs, dto)
-			}
-		}
-		taskDTOs = filteredDTOs
-	}
-
-	logging.Info("Retrieved %d tasks", len(taskDTOs))
 	return taskDTOs, nil
 }
 
-// GetTask retrieves a task by ID
-func (s *TaskService) GetTask(id string) (*dtos.TaskDTO, error) {
-	logging.Info("Fetching task with ID: %s", id)
-	task, err := s.repo.GetByID(id)
-	if err != nil {
-		logging.Error("Failed to fetch task with ID %s: %v", id, err)
-		return nil, err
-	}
-	logging.Info("Successfully fetched task with ID: %s", id)
-	dto := s.adapter.ToTaskDTO(task)
-	return &dto, nil
-}
-
 // UpdateTask updates an existing task
-func (s *TaskService) UpdateTask(dto dtos.UpdateTaskDTO) (*dtos.TaskDTO, error) {
+func (s *TaskService) UpdateTask(ctx context.Context, dto dtos.UpdateTaskDTO) (*dtos.TaskDTO, error) {
 	logging.Info("Updating task with ID: %s", dto.ID)
 
 	// Create TaskDTO from UpdateTaskDTO
@@ -141,7 +120,7 @@ func (s *TaskService) UpdateTask(dto dtos.UpdateTaskDTO) (*dtos.TaskDTO, error) 
 	}
 
 	// Get existing task to preserve CreatedAt
-	existingTask, err := s.repo.GetByID(dto.ID)
+	existingTask, err := s.repo.GetByID(ctx, dto.ID)
 	if err != nil {
 		logging.Error("Failed to get existing task: %v", err)
 		return nil, err
@@ -157,7 +136,7 @@ func (s *TaskService) UpdateTask(dto dtos.UpdateTaskDTO) (*dtos.TaskDTO, error) 
 		return nil, err
 	}
 
-	if err := s.repo.Update(task); err != nil {
+	if err := s.repo.Update(ctx, task); err != nil {
 		logging.Error("Failed to update task in repository: %v", err)
 		return nil, err
 	}
@@ -169,9 +148,9 @@ func (s *TaskService) UpdateTask(dto dtos.UpdateTaskDTO) (*dtos.TaskDTO, error) 
 }
 
 // DeleteTask deletes a task by ID
-func (s *TaskService) DeleteTask(id string) error {
+func (s *TaskService) DeleteTask(ctx context.Context, id string) error {
 	logging.Info("Deleting task with ID: %s", id)
-	if err := s.repo.Delete(id); err != nil {
+	if err := s.repo.Delete(ctx, id); err != nil {
 		logging.Error("Failed to delete task with ID %s: %v", id, err)
 		return err
 	}
@@ -187,10 +166,7 @@ func (s *TaskService) validateTask(task *models.Task) error {
 	if task.Title == "" {
 		return common.ErrInvalidTaskStatus
 	}
-	if !s.isValidStatus(task.Status) {
-		return common.ErrInvalidTaskStatus
-	}
-	if task.DueDate.IsZero() {
+	if !s.isValidStatus(models.TaskStatus(task.Status)) {
 		return common.ErrInvalidTaskStatus
 	}
 	return nil
@@ -214,11 +190,11 @@ func (s *TaskService) validateTaskStatus(status string) error {
 }
 
 // GetTasksByUserID retrieves all tasks for a specific user
-func (s *TaskService) GetTasksByUserID(userID string) ([]*dtos.TaskDTO, error) {
+func (s *TaskService) GetTasksByUserID(ctx context.Context, userID string) ([]*dtos.TaskDTO, error) {
 	logging.Info("Retrieving tasks for user ID: %s", userID)
 
 	// Validate user exists
-	user, err := s.userRepo.GetByID(userID)
+	user, err := s.userService.GetUserByID(userID)
 	if err != nil {
 		logging.Error("Error finding user: %v", err)
 		return nil, err
@@ -230,14 +206,14 @@ func (s *TaskService) GetTasksByUserID(userID string) ([]*dtos.TaskDTO, error) {
 	logging.Info("Found user: %v", user)
 
 	// Get all tasks
-	tasks, err := s.repo.GetAll()
+	tasks, err := s.repo.GetAll(ctx)
 	if err != nil {
 		logging.Error("Error retrieving tasks: %v", err)
 		return nil, err
 	}
 	logging.Info("Retrieved %d total tasks", len(tasks))
 
-	// Filter tasks for the user
+// Filter tasks for the user
 	var userTasks []*dtos.TaskDTO
 	for _, task := range tasks {
 		if task.UserID == userID {

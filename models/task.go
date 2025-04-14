@@ -2,23 +2,33 @@ package models
 
 import "time"
 
-// TaskStatus represents the possible states of a task
+// TaskStatus represents the status of a task
 type TaskStatus string
 
 const (
-	TaskStatusPending     TaskStatus = "pending"
+	TaskStatusPending   TaskStatus = "pending"
 	TaskStatusInProgress TaskStatus = "in_progress"
 	TaskStatusCompleted  TaskStatus = "completed"
 )
 
-// Task represents a task in our system
+// TaskPriority represents the priority of a task
+type TaskPriority string
+
+const (
+	TaskPriorityLow    TaskPriority = "low"
+	TaskPriorityMedium TaskPriority = "medium"
+	TaskPriorityHigh   TaskPriority = "high"
+)
+
+// Task represents a task entity
 type Task struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"user_id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Status      TaskStatus `json:"status"`
-	DueDate     Date       `json:"due_date"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          string       `bson:"_id,omitempty" json:"id"`
+	Title       string       `bson:"title" json:"title"`
+	Description string       `bson:"description" json:"description"`
+	UserID      string       `bson:"user_id" json:"user_id"`
+	Status      string   `bson:"status" json:"status"`
+	// Priority    TaskPriority `bson:"priority" json:"priority"`
+	DueDate     Date         `bson:"due_date" json:"due_date"`
+	CreatedAt   time.Time    `bson:"created_at" json:"created_at"`
+	UpdatedAt   time.Time    `bson:"updated_at" json:"updated_at"`
 } 
