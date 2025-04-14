@@ -1,13 +1,12 @@
-# User Service
+# task manager Service
 
-A microservice for user management built with Go and MongoDB.
+A microservice for task management built with Go and MongoDB.
 
 ## Features
 
 - User CRUD operations (Create, Read, Update, Delete)
 - MongoDB integration for data persistence
 - RESTful API with JSON responses
-- Input validation for email, password, and username
 - Environment-based configuration
 - Health check endpoint
 
@@ -23,7 +22,7 @@ The service can be configured using environment variables:
 ```env
 PORT=8081                            # Server port (default: 8081)
 MONGO_URI=mongodb://localhost:27017  # MongoDB connection URI
-DB_NAME=user_service                 # MongoDB database name
+DB_NAME=task_manager                # MongoDB database name
 ```
 
 ## Installation
@@ -52,68 +51,11 @@ GET /health
 Response: 200 OK
 ```
 
-### Create User
-```
-POST /api/v1/users
-Content-Type: application/json
-
-Request:
-{
-    "email": "user@example.com",
-    "password": "password123",
-    "username": "johndoe"
-}
-
-Response: 201 Created
-{
-    "id": "...",
-    "email": "user@example.com",
-    "username": "johndoe",
-    "created_at": "...",
-    "updated_at": "..."
-}
-```
-
-### Get User
-```
-GET /api/v1/users/{id}
-Response: 200 OK
-```
-
-### Get All Users
-```
-GET /api/v1/users
-Response: 200 OK
-```
-
-### Update User
-```
-PUT /api/v1/users/{id}
-Content-Type: application/json
-
-Request:
-{
-    "email": "newemail@example.com",
-    "password": "newpassword123",
-    "username": "newusername"
-}
-
-Response: 200 OK
-```
-
-### Delete User
-```
-DELETE /api/v1/users/{id}
-Response: 204 No Content
-```
-
 ## Error Responses
 
 The API returns appropriate HTTP status codes and error messages:
 
 - 400 Bad Request: Invalid input data
-- 404 Not Found: User not found
-- 409 Conflict: User already exists
 - 500 Internal Server Error: Server-side error
 
 ## Project Structure
